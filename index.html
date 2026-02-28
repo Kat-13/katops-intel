@@ -430,6 +430,55 @@
       border-bottom: 1px solid var(--border);
     }
 
+    /* ===== SEARCH TERMS ===== */
+    .search-terms-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .search-terms-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .search-terms-input:focus { border-color: var(--gold-dim); }
+
+    .search-apply-btn {
+      background: none;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      padding: 6px 12px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .search-apply-btn:hover { background: var(--gold); color: var(--bg); }
+
+    .search-terms-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 5px;
+    }
+
     /* ===== CURSOR ===== */
     .cursor {
       display: inline-block;
@@ -585,6 +634,13 @@
 
     <div class="card">
       <div class="card-label">Crude Watch // Oil &middot; Iran &middot; OPEC &middot; Geopolitics</div>
+      <div class="search-terms-label">Search Terms</div>
+      <div class="search-terms-row">
+        <input type="text" class="search-terms-input" id="oil-search-terms"
+          value="crude oil WTI Iran OPEC Hormuz petroleum energy barrel"
+          placeholder="Enter search terms separated by spaces">
+        <button class="search-apply-btn" onclick="applyOilSearch()">Apply</button>
+      </div>
       <div id="oil-news-count" class="news-count" style="display:none;"></div>
       <div class="news-feed" id="oil-news">
         <div class="news-loading">SCANNING FEEDS...</div>
@@ -593,6 +649,13 @@
 
     <div class="card">
       <div class="card-label">Crypto Watch // Bitcoin &middot; Stablecoin &middot; Regulation</div>
+      <div class="search-terms-label">Search Terms</div>
+      <div class="search-terms-row">
+        <input type="text" class="search-terms-input" id="crypto-search-terms"
+          value="bitcoin stablecoin crypto regulation SEC CBDC blockchain"
+          placeholder="Enter search terms separated by spaces">
+        <button class="search-apply-btn" onclick="applyCryptoSearch()">Apply</button>
+      </div>
       <div id="crypto-news-count" class="news-count" style="display:none;"></div>
       <div class="news-feed" id="crypto-news">
         <div class="news-loading">SCANNING FEEDS...</div>
@@ -719,19 +782,32 @@ async function fetchBTC() {
 // NEWS FEEDS — Multi-source with fallback
 // ============================================================
 
-// Primary: Google News RSS (broadest coverage, all sources across the internet)
-const OIL_GNEWS   = 'https://news.google.com/rss/search?q=crude+oil+WTI+Iran+OPEC+Hormuz+petroleum+energy+barrel&hl=en-US&gl=US&ceid=US:en';
-const CRYPTO_GNEWS= 'https://news.google.com/rss/search?q=bitcoin+stablecoin+crypto+regulation+SEC+CBDC+blockchain&hl=en-US&gl=US&ceid=US:en';
-
 // Fallback specialist feeds
 const OIL_FALLBACK   = 'https://oilprice.com/rss/main';
 const CRYPTO_FALLBACK= 'https://cointelegraph.com/rss';
+
+const MAX_AGE_DAYS = 7;
+
+function buildGNewsURL(terms) {
+  const q = encodeURIComponent(terms.trim().replace(/\s+/g, ' '));
+  return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+}
+
+function getOilTerms() {
+  return document.getElementById('oil-search-terms').value.trim() || 'crude oil WTI Iran OPEC Hormuz petroleum energy barrel';
+}
+
+function getCryptoTerms() {
+  return document.getElementById('crypto-search-terms').value.trim() || 'bitcoin stablecoin crypto regulation SEC CBDC blockchain';
+}
 
 function parseRSSXML(xmlText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'text/xml');
   const items = doc.querySelectorAll('item');
   const results = [];
+  const cutoff = Date.now() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
   items.forEach(item => {
     const title   = item.querySelector('title');
     const link    = item.querySelector('link');
@@ -747,7 +823,6 @@ function parseRSSXML(xmlText) {
 
     let linkHref = '';
     if (link) {
-      // <link> in RSS can be text node or nextSibling text
       linkHref = link.textContent.trim() || '';
     }
 
@@ -758,13 +833,24 @@ function parseRSSXML(xmlText) {
       try { sourceName = new URL(linkHref).hostname.replace(/^www\./, ''); } catch(e) {}
     }
 
+    const pubDateStr = pubDate ? pubDate.textContent.trim() : '';
+    const pubMs = pubDateStr ? new Date(pubDateStr).getTime() : 0;
+
+    // Filter: skip articles older than MAX_AGE_DAYS
+    if (pubMs && pubMs < cutoff) return;
+
     results.push({
       title:   titleText,
       link:    linkHref,
-      pubDate: pubDate ? pubDate.textContent.trim() : '',
+      pubDate: pubDateStr,
+      pubMs:   pubMs || 0,
       source:  sourceName,
     });
   });
+
+  // Sort by most recent first
+  results.sort((a, b) => b.pubMs - a.pubMs);
+
   return results;
 }
 
@@ -784,9 +870,10 @@ async function fetchFeedViaProxy(rssUrl, timeout = 15000) {
 }
 
 async function fetchOilNews() {
-  // Try Google News first (broadest coverage)
+  // Try Google News first (broadest coverage, uses live search terms)
   try {
-    const items = await fetchFeedViaProxy(OIL_GNEWS, 18000);
+    const url = buildGNewsURL(getOilTerms());
+    const items = await fetchFeedViaProxy(url, 18000);
     if (items.length > 0) return { items, source: 'Google News' };
   } catch(e) {
     console.warn('Oil Google News failed:', e.message);
@@ -802,9 +889,10 @@ async function fetchOilNews() {
 }
 
 async function fetchCryptoNews() {
-  // Try Google News first (broadest coverage)
+  // Try Google News first (broadest coverage, uses live search terms)
   try {
-    const items = await fetchFeedViaProxy(CRYPTO_GNEWS, 18000);
+    const url = buildGNewsURL(getCryptoTerms());
+    const items = await fetchFeedViaProxy(url, 18000);
     if (items.length > 0) return { items, source: 'Google News' };
   } catch(e) {
     console.warn('Crypto Google News failed:', e.message);
@@ -817,6 +905,18 @@ async function fetchCryptoNews() {
     console.warn('Crypto fallback feed failed:', e.message);
   }
   return { items: [], source: null };
+}
+
+function applyOilSearch() {
+  document.getElementById('oil-news').innerHTML = '<div class="news-loading">SCANNING FEEDS...</div>';
+  document.getElementById('oil-news-count').style.display = 'none';
+  fetchOilNews().then(result => renderNews(result, 'oil-news', 'oil-news-count'));
+}
+
+function applyCryptoSearch() {
+  document.getElementById('crypto-news').innerHTML = '<div class="news-loading">SCANNING FEEDS...</div>';
+  document.getElementById('crypto-news-count').style.display = 'none';
+  fetchCryptoNews().then(result => renderNews(result, 'crypto-news', 'crypto-news-count'));
 }
 
 // ============================================================
@@ -925,10 +1025,11 @@ function renderNews(result, feedId, countId) {
   }
 
   const displayItems = items.slice(0, 20);
+  const filtered = items.length;
 
   if (countEl) {
     countEl.style.display = 'block';
-    countEl.textContent   = `${displayItems.length} articles &mdash; via ${source || 'RSS'}`;
+    countEl.textContent   = `${filtered} article${filtered !== 1 ? 's' : ''} within 7 days — via ${source || 'RSS'}`;
   }
 
   feedEl.innerHTML = displayItems.map(item => {
