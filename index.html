@@ -637,8 +637,8 @@
       <div class="search-terms-label">Search Terms</div>
       <div class="search-terms-row">
         <input type="text" class="search-terms-input" id="oil-search-terms"
-          value="crude oil WTI Iran OPEC Hormuz petroleum energy barrel"
-          placeholder="Enter search terms separated by spaces">
+          value="crude oil, WTI oil price, Iran oil, OPEC, Strait of Hormuz, petroleum market, oil barrel price"
+          placeholder="Enter terms separated by commas (each term is queried individually)">
         <button class="search-apply-btn" onclick="applyOilSearch()">Apply</button>
       </div>
       <div id="oil-news-count" class="news-count" style="display:none;"></div>
@@ -652,8 +652,8 @@
       <div class="search-terms-label">Search Terms</div>
       <div class="search-terms-row">
         <input type="text" class="search-terms-input" id="crypto-search-terms"
-          value="bitcoin stablecoin crypto regulation SEC CBDC blockchain"
-          placeholder="Enter search terms separated by spaces">
+          value="bitcoin price, stablecoin, crypto regulation, SEC crypto, blockchain finance, bitcoin ETF, crypto market"
+          placeholder="Enter terms separated by commas (each term is queried individually)">
         <button class="search-apply-btn" onclick="applyCryptoSearch()">Apply</button>
       </div>
       <div id="crypto-news-count" class="news-count" style="display:none;"></div>
@@ -788,18 +788,29 @@ const CRYPTO_FALLBACK= 'https://cointelegraph.com/rss';
 
 const MAX_AGE_DAYS = 7;
 
-function buildGNewsURL(terms) {
-  const q = encodeURIComponent(terms.trim().replace(/\s+/g, ' '));
+// Default per-term lists — each term is queried individually and results are merged
+const OIL_DEFAULT_TERMS   = ['crude oil', 'WTI oil price', 'Iran oil', 'OPEC', 'Strait of Hormuz', 'petroleum market', 'oil barrel price'];
+const CRYPTO_DEFAULT_TERMS= ['bitcoin price', 'stablecoin', 'crypto regulation', 'SEC crypto', 'blockchain finance', 'bitcoin ETF', 'crypto market'];
+
+function buildGNewsURL(term) {
+  const q = encodeURIComponent(term.trim());
   return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
 
-function getOilTerms() {
-  return document.getElementById('oil-search-terms').value.trim() || 'crude oil WTI Iran OPEC Hormuz petroleum energy barrel';
+function getTermsList(inputId, defaults) {
+  const raw = document.getElementById(inputId).value.trim();
+  if (!raw) return defaults;
+  // Split on commas or newlines; fall back to splitting on spaces if no commas/newlines
+  const byComma = raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+  return byComma.length > 1 ? byComma : raw.split(/\s+/).reduce((acc, word, i, arr) => {
+    // Group into 1-3 word phrases by splitting on spaces — just use each word as its own term
+    acc.push(word);
+    return acc;
+  }, []);
 }
 
-function getCryptoTerms() {
-  return document.getElementById('crypto-search-terms').value.trim() || 'bitcoin stablecoin crypto regulation SEC CBDC blockchain';
-}
+function getOilTerms()    { return getTermsList('oil-search-terms',    OIL_DEFAULT_TERMS); }
+function getCryptoTerms() { return getTermsList('crypto-search-terms', CRYPTO_DEFAULT_TERMS); }
 
 function parseRSSXML(xmlText) {
   const parser = new DOMParser();
@@ -860,7 +871,7 @@ function decodeHTMLEntities(str) {
   return el.textContent || el.innerText || str;
 }
 
-async function fetchFeedViaProxy(rssUrl, timeout = 15000) {
+async function fetchFeedViaProxy(rssUrl, timeout = 18000) {
   const proxied = PROXY + encodeURIComponent(rssUrl);
   const res = await fetch(proxied, { signal: AbortSignal.timeout(timeout) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -869,19 +880,43 @@ async function fetchFeedViaProxy(rssUrl, timeout = 15000) {
   return parseRSSXML(text);
 }
 
-async function fetchOilNews() {
-  // Try Google News first (broadest coverage, uses live search terms)
+// Fetch one Google News RSS term and return items, silently returning [] on failure
+async function fetchOneTerm(term) {
   try {
-    const url = buildGNewsURL(getOilTerms());
-    const items = await fetchFeedViaProxy(url, 18000);
-    if (items.length > 0) return { items, source: 'Google News' };
+    return await fetchFeedViaProxy(buildGNewsURL(term), 15000);
   } catch(e) {
-    console.warn('Oil Google News failed:', e.message);
+    console.warn(`Term "${term}" failed:`, e.message);
+    return [];
   }
+}
+
+// Merge arrays of items, dedup by title, sort by most recent
+function mergeAndDedup(arrays) {
+  const seen = new Set();
+  const merged = [];
+  for (const arr of arrays) {
+    for (const item of arr) {
+      const key = item.title.toLowerCase().slice(0, 80);
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(item);
+      }
+    }
+  }
+  merged.sort((a, b) => b.pubMs - a.pubMs);
+  return merged;
+}
+
+async function fetchOilNews() {
+  const terms = getOilTerms();
+  // Fetch all terms in parallel
+  const results = await Promise.all(terms.map(t => fetchOneTerm(t)));
+  const items = mergeAndDedup(results);
+  if (items.length > 0) return { items, source: 'Google News' };
   // Fallback to OilPrice.com
   try {
-    const items = await fetchFeedViaProxy(OIL_FALLBACK, 12000);
-    if (items.length > 0) return { items, source: 'OilPrice.com' };
+    const fallback = await fetchFeedViaProxy(OIL_FALLBACK, 12000);
+    if (fallback.length > 0) return { items: fallback, source: 'OilPrice.com' };
   } catch(e) {
     console.warn('Oil fallback feed failed:', e.message);
   }
@@ -889,18 +924,15 @@ async function fetchOilNews() {
 }
 
 async function fetchCryptoNews() {
-  // Try Google News first (broadest coverage, uses live search terms)
-  try {
-    const url = buildGNewsURL(getCryptoTerms());
-    const items = await fetchFeedViaProxy(url, 18000);
-    if (items.length > 0) return { items, source: 'Google News' };
-  } catch(e) {
-    console.warn('Crypto Google News failed:', e.message);
-  }
+  const terms = getCryptoTerms();
+  // Fetch all terms in parallel
+  const results = await Promise.all(terms.map(t => fetchOneTerm(t)));
+  const items = mergeAndDedup(results);
+  if (items.length > 0) return { items, source: 'Google News' };
   // Fallback to CoinTelegraph
   try {
-    const items = await fetchFeedViaProxy(CRYPTO_FALLBACK, 12000);
-    if (items.length > 0) return { items, source: 'CoinTelegraph' };
+    const fallback = await fetchFeedViaProxy(CRYPTO_FALLBACK, 12000);
+    if (fallback.length > 0) return { items: fallback, source: 'CoinTelegraph' };
   } catch(e) {
     console.warn('Crypto fallback feed failed:', e.message);
   }
