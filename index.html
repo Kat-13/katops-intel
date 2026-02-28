@@ -560,29 +560,59 @@
     </div>
   </div>
 
-  <!-- BTC CARD -->
+  <!-- BTC CARD + SHORT CALCULATOR -->
   <div class="card" id="btc-card">
-    <div class="card-label">Bitcoin // BTC / USD</div>
+    <div class="card-label">Bitcoin // BTC / USD &middot; Short Position Calculator</div>
     <div class="price-big"><span class="price-unit">$</span><span id="btc-val">---</span></div>
-    <div class="price-change-row">
+    <div class="price-change-row" id="btc-change-row">
       <span id="btc-change" style="color:var(--dim)">Loading...</span>
     </div>
-    <div class="price-meta" id="btc-meta">
-      <strong>Micro (MBT)</strong> = 0.1 BTC &middot; cash settled<br>
-      <strong>Full (BTC)</strong> = 5 BTC &middot; cash settled<br>
-      <strong>No delivery</strong> &middot; close or roll to exit
+    <div class="price-meta" style="margin-bottom:14px">
+      <strong>Micro (MBT)</strong> = 0.1 BTC &middot; cash settled &nbsp;&nbsp;
+      <strong>Full (BTC)</strong> = 5 BTC &middot; cash settled
     </div>
-    <div class="intraday-bar" id="btc-intraday" style="display:none;">
-      <div class="intraday-label-row">
-        <span id="btc-low-lbl">Low</span>
-        <span style="letter-spacing:2px;font-size:9px;color:var(--dim)">INTRADAY RANGE</span>
-        <span id="btc-high-lbl">High</span>
+
+    <div class="calc-inputs">
+      <div class="input-group">
+        <div class="input-label">Short Entry ($)</div>
+        <input type="number" class="input-field" id="btc-entry" value="84000" step="100" oninput="updateBtcCalc()">
       </div>
-      <div class="intraday-track">
-        <div class="intraday-fill" id="btc-range-fill" style="width:50%"></div>
-        <div class="intraday-marker" id="btc-range-marker" style="left:50%"></div>
+      <div class="input-group">
+        <div class="input-label">Contract Size</div>
+        <select class="input-field" id="btc-size" onchange="updateBtcCalc()" style="cursor:pointer">
+          <option value="0.1">Micro (0.1 BTC)</option>
+          <option value="5">Full (5 BTC)</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Current Price ($)</div>
+        <input type="number" class="input-field" id="btc-current" value="84000" step="100" oninput="onManualBtcPrice()">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Stop Loss ($)</div>
+        <input type="number" class="input-field" id="btc-stop" value="95000" step="100" oninput="updateBtcCalc()">
       </div>
     </div>
+
+    <div class="live-pnl-bar">
+      <div>
+        <div class="pnl-label">Live P&amp;L &middot; SHORT</div>
+        <div class="pnl-sub" id="btc-pnl-sub">Micro &middot; 0.1 BTC</div>
+      </div>
+      <div class="pnl-value" id="btc-pnl-value">$0</div>
+    </div>
+
+    <table class="pnl-table">
+      <thead>
+        <tr>
+          <th>BTC Price</th>
+          <th>+/- Move</th>
+          <th>P&amp;L</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody id="btc-pnl-body"></tbody>
+    </table>
   </div>
 
   <!-- CALCULATOR -->
@@ -1165,6 +1195,12 @@ async function refreshAll() {
       updateCalc();
     }
 
+    // Auto-sync BTC current price field
+    if (btc && btcAutoUpdate) {
+      document.getElementById('btc-current').value = Math.round(btc.price);
+      updateBtcCalc();
+    }
+
     // News loads in parallel (non-blocking — doesn't delay price display)
     Promise.all([fetchOilNews(), fetchCryptoNews()])
       .then(([oilResult, cryptoResult]) => {
@@ -1183,9 +1219,87 @@ async function refreshAll() {
 }
 
 // ============================================================
+// BTC SHORT CALCULATOR
+// ============================================================
+let btcAutoUpdate = true;
+
+const BTC_TARGETS = [
+  { price: 100000, label: 'Max loss scenario',   section: 'loss'   },
+  { price: 95000,  label: 'STOP LOSS',           section: 'stop'   },
+  { price: 90000,  label: 'Caution zone',        section: 'loss'   },
+  { price: 84000,  label: 'Entry',               section: 'entry'  },
+  { price: 75000,  label: 'Min target',          section: 'profit' },
+  { price: 65000,  label: 'Solid win',           section: 'profit' },
+  { price: 55000,  label: 'Strong',              section: 'profit' },
+  { price: 45000,  label: 'Very strong',         section: 'profit' },
+  { price: 35000,  label: 'Primary target',      section: 'profit' },
+  { price: 25000,  label: 'Max scenario',        section: 'profit' },
+];
+
+function onManualBtcPrice() {
+  btcAutoUpdate = false;
+  updateBtcCalc();
+}
+
+function updateBtcCalc() {
+  const entry   = parseFloat(document.getElementById('btc-entry').value)   || 84000;
+  const size    = parseFloat(document.getElementById('btc-size').value)    || 0.1;
+  const current = parseFloat(document.getElementById('btc-current').value) || entry;
+  const stop    = parseFloat(document.getElementById('btc-stop').value)    || 95000;
+
+  // SHORT: profit when price goes DOWN
+  const livePnl = (entry - current) * size;
+
+  const pnlEl  = document.getElementById('btc-pnl-value');
+  const pnlSub = document.getElementById('btc-pnl-sub');
+  pnlEl.textContent = fmtDollar(livePnl);
+  pnlEl.style.color = livePnl >= 0 ? 'var(--green)' : 'var(--red)';
+  pnlSub.textContent = `${size === 0.1 ? 'Micro' : 'Full'} \u00b7 ${size} BTC`;
+
+  const entryTarget = BTC_TARGETS.find(t => t.section === 'entry');
+  const stopTarget  = BTC_TARGETS.find(t => t.section === 'stop');
+  if (entryTarget) entryTarget.price = entry;
+  if (stopTarget)  stopTarget.price  = stop;
+
+  const tbody = document.getElementById('btc-pnl-body');
+  tbody.innerHTML = BTC_TARGETS.map(t => {
+    const pnl      = (entry - t.price) * size;
+    const isProfit = pnl > 0;
+    const isStop   = t.section === 'stop';
+    const isEntry  = t.section === 'entry';
+    const isLive   = !isEntry && Math.abs(t.price - current) < 2000 && t.price !== entry;
+
+    const rowClass = [
+      isLive   ? 'row-live'   : '',
+      isStop   ? 'row-stop'   : '',
+      isProfit ? 'row-profit' : 'row-loss',
+    ].filter(Boolean).join(' ');
+
+    const signal = isLive  ? 'LIVE'
+                 : isStop  ? 'EXIT'
+                 : isEntry ? 'SHORT ENTRY'
+                 : t.label;
+
+    // For a short: price above entry = loss (red), price below entry = profit (green)
+    const diff    = t.price - entry;
+    const diffStr = isEntry ? '0' : (diff > 0 ? '+$' : '-$') + Math.abs(diff).toLocaleString();
+    const diffCls = diff > 0 ? 'down' : 'up';
+    const pnlStr  = isEntry ? '&mdash;' : fmtDollar(pnl);
+
+    return `<tr class="${rowClass}">
+      <td>$${Math.round(t.price).toLocaleString()}</td>
+      <td class="${diffCls}">${diffStr}</td>
+      <td>${pnlStr}</td>
+      <td>${signal}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
 // INIT
 // ============================================================
 updateCalc();
+updateBtcCalc();
 refreshAll();
 
 // Auto-refresh every 90 seconds
