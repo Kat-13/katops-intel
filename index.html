@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KATOPS // MARKET INTEL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07070f;
+      --card: #0c0c18;
+      --card2: #0f0f1e;
+      --border: #1a1a30;
+      --gold: #f0a500;
+      --gold-dim: #7a5200;
+      --gold-glow: rgba(240,165,0,0.12);
+      --green: #00d4aa;
+      --red: #ff3b5c;
+      --text: #c8c8d4;
+      --dim: #44445a;
+      --bright: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 0% 0%, rgba(240,165,0,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, rgba(0,212,170,0.03) 0%, transparent 50%);
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(90deg, rgba(240,165,0,0.06) 0%, transparent 50%);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 24px; }
+
+    .logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 5px;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .logo span { color: var(--dim); font-weight: 400; }
+
+    .tagline {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--dim);
+      text-transform: uppercase;
+      border-left: 1px solid var(--border);
+      padding-left: 24px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--green); }
+      50% { opacity: 0.4; box-shadow: none; }
+    }
+
+    .last-update { font-size: 10px; color: var(--dim); }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      padding: 6px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { background: var(--gold); color: var(--bg); }
+    .refresh-btn:active { transform: scale(0.97); }
+    .refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+    /* ===== LAYOUT ===== */
+    .main {
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.4fr;
+      grid-template-rows: auto auto;
+      gap: 16px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, var(--gold), transparent);
+    }
+
+    .card-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ===== PRICE CARDS ===== */
+    .price-big {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 60px;
+      font-weight: 700;
+      color: var(--bright);
+      line-height: 1;
+      margin-bottom: 6px;
+      letter-spacing: -1px;
+    }
+
+    .price-unit {
+      font-size: 28px;
+      color: var(--dim);
+      font-weight: 400;
+    }
+
+    .price-change-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .up { color: var(--green); }
+    .down { color: var(--red); }
+
+    .price-meta {
+      color: var(--dim);
+      font-size: 10px;
+      line-height: 1.9;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+
+    .price-meta strong {
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    /* ===== INTRADAY BAR ===== */
+    .intraday-bar {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .intraday-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    .intraday-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      position: relative;
+    }
+
+    .intraday-fill {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+      transition: width 0.5s ease;
+    }
+
+    .intraday-marker {
+      position: absolute;
+      top: -3px;
+      width: 2px;
+      height: 10px;
+      background: var(--bright);
+      border-radius: 1px;
+      transform: translateX(-50%);
+    }
+
+    /* ===== CALCULATOR ===== */
+    .calc-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 5px; }
+
+    .input-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .input-field {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--gold);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      padding: 8px 10px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus { border-color: var(--gold-dim); box-shadow: 0 0 10px rgba(240,165,0,0.1); }
+
+    .live-pnl-bar {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .live-pnl-bar::before {
+      content: 'LIVE P&L';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 40px;
+      font-weight: 900;
+      color: rgba(240,165,0,0.04);
+      letter-spacing: 8px;
+      white-space: nowrap;
+    }
+
+    .pnl-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .pnl-sub {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 3px;
+    }
+
+    .pnl-value {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      transition: color 0.3s;
+    }
+
+    /* ===== P&L TABLE ===== */
+    .pnl-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .pnl-table th {
+      text-align: left;
+      padding: 6px 8px;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--dim);
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+    }
+
+    .pnl-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+      transition: background 0.2s;
+    }
+
+    .pnl-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .pnl-table tr.row-live td { background: rgba(240,165,0,0.08); color: var(--gold); }
+    .pnl-table tr.row-stop td { background: rgba(255,59,92,0.06); }
+    .pnl-table tr.row-profit td:nth-child(3) { color: var(--green); }
+    .pnl-table tr.row-loss td:nth-child(3) { color: var(--red); }
+    .pnl-table tr.row-stop td:nth-child(4) { color: var(--red); }
+
+    .divider-row td {
+      border-top: 1px solid var(--border) !important;
+      padding-top: 8px !important;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    /* ===== NEWS ===== */
+    .news-section {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .news-feed {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .news-feed::-webkit-scrollbar { width: 2px; }
+    .news-feed::-webkit-scrollbar-track { background: transparent; }
+    .news-feed::-webkit-scrollbar-thumb { background: var(--gold-dim); }
+
+    .news-item {
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      cursor: pointer;
+      transition: padding-left 0.15s;
+    }
+
+    .news-item:hover { padding-left: 6px; }
+    .news-item:last-child { border-bottom: none; }
+
+    .news-source {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .news-title {
+      color: var(--text);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .news-title:hover { color: var(--bright); }
+
+    .news-loading {
+      padding: 30px 0;
+      text-align: center;
+      color: var(--dim);
+      font-size: 10px;
+      letter-spacing: 3px;
+      animation: fadetext 1.5s ease-in-out infinite;
+    }
+
+    @keyframes fadetext {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    .news-error {
+      color: var(--red);
+      font-size: 10px;
+      padding: 10px 0;
+      letter-spacing: 1px;
+    }
+
+    .news-count {
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ===== CURSOR ===== */
+    .cursor {
+      display: inline-block;
+      width: 9px; height: 16px;
+      background: var(--gold);
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+      margin-left: 3px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ===== PRICE FLASH ===== */
+    @keyframes flashGreen {
+      0% { background: rgba(0,212,170,0.18); }
+      100% { background: transparent; }
+    }
+    @keyframes flashRed {
+      0% { background: rgba(255,59,92,0.18); }
+      100% { background: transparent; }
+    }
+    .flash-up { animation: flashGreen 0.7s ease-out; }
+    .flash-down { animation: flashRed 0.7s ease-out; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .main { grid-template-columns: 1fr 1fr; }
+      .news-section { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 640px) {
+      .main { grid-template-columns: 1fr; padding: 12px; }
+      .news-section { grid-template-columns: 1fr; }
+      .tagline { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo">Kat<span>Ops</span><span class="cursor"></span></div>
+    <div class="tagline">Crude &middot; Crypto &middot; Intel</div>
+  </div>
+  <div class="header-right">
+    <div class="status-indicator"><span class="dot"></span>LIVE</div>
+    <div class="last-update">Updated: <span id="last-update">--</span></div>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshAll()">Refresh</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- WTI CARD -->
+  <div class="card" id="wti-card">
+    <div class="card-label">WTI Crude Oil // CL Futures</div>
+    <div class="price-big"><span class="price-unit">$</span><span id="wti-val">---</span></div>
+    <div class="price-change-row">
+      <span id="wti-change" style="color:var(--dim)">Loading...</span>
+    </div>
+    <div class="price-meta" id="wti-meta">
+      <strong>1 contract</strong> = 1,000 barrels<br>
+      <strong>Settlement</strong> &middot; MAR 20, 2026<br>
+      <strong>Margin req.</strong> &middot; ~$5&ndash;7K / contract
+    </div>
+    <div class="intraday-bar" id="wti-intraday" style="display:none;">
+      <div class="intraday-label-row">
+        <span id="wti-low-lbl">Low</span>
+        <span style="letter-spacing:2px;font-size:9px;color:var(--dim)">INTRADAY RANGE</span>
+        <span id="wti-high-lbl">High</span>
+      </div>
+      <div class="intraday-track">
+        <div class="intraday-fill" id="wti-range-fill" style="width:50%"></div>
+        <div class="intraday-marker" id="wti-range-marker" style="left:50%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BTC CARD -->
+  <div class="card" id="btc-card">
+    <div class="card-label">Bitcoin // BTC / USD</div>
+    <div class="price-big"><span class="price-unit">$</span><span id="btc-val">---</span></div>
+    <div class="price-change-row">
+      <span id="btc-change" style="color:var(--dim)">Loading...</span>
+    </div>
+    <div class="price-meta" id="btc-meta">
+      <strong>Micro (MBT)</strong> = 0.1 BTC &middot; cash settled<br>
+      <strong>Full (BTC)</strong> = 5 BTC &middot; cash settled<br>
+      <strong>No delivery</strong> &middot; close or roll to exit
+    </div>
+    <div class="intraday-bar" id="btc-intraday" style="display:none;">
+      <div class="intraday-label-row">
+        <span id="btc-low-lbl">Low</span>
+        <span style="letter-spacing:2px;font-size:9px;color:var(--dim)">INTRADAY RANGE</span>
+        <span id="btc-high-lbl">High</span>
+      </div>
+      <div class="intraday-track">
+        <div class="intraday-fill" id="btc-range-fill" style="width:50%"></div>
+        <div class="intraday-marker" id="btc-range-marker" style="left:50%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATOR -->
+  <div class="card" style="grid-row: span 1;">
+    <div class="card-label">Trade Calculator // WTI Long Position</div>
+
+    <div class="calc-inputs">
+      <div class="input-group">
+        <div class="input-label">Entry Price ($)</div>
+        <input type="number" class="input-field" id="entry-price" value="65.68" step="0.01" oninput="updateCalc()">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Contracts</div>
+        <input type="number" class="input-field" id="num-contracts" value="1" min="1" oninput="updateCalc()">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Current Price ($)</div>
+        <input type="number" class="input-field" id="current-price" value="65.68" step="0.01" oninput="onManualPrice()">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Stop Loss ($)</div>
+        <input type="number" class="input-field" id="stop-loss" value="63.00" step="0.01" oninput="updateCalc()">
+      </div>
+    </div>
+
+    <div class="live-pnl-bar">
+      <div>
+        <div class="pnl-label">Live P&amp;L</div>
+        <div class="pnl-sub" id="pnl-sub">1 contract &middot; 1,000 bbl</div>
+      </div>
+      <div class="pnl-value" id="pnl-value">$0</div>
+    </div>
+
+    <table class="pnl-table">
+      <thead>
+        <tr>
+          <th>Price</th>
+          <th>+/- / Bbl</th>
+          <th>P&amp;L</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody id="pnl-body"></tbody>
+    </table>
+  </div>
+
+  <!-- NEWS SECTION -->
+  <div class="news-section">
+
+    <div class="card">
+      <div class="card-label">Crude Watch // Oil &middot; Iran &middot; OPEC &middot; Geopolitics</div>
+      <div id="oil-news-count" class="news-count" style="display:none;"></div>
+      <div class="news-feed" id="oil-news">
+        <div class="news-loading">SCANNING FEEDS...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Crypto Watch // Bitcoin &middot; Stablecoin &middot; Regulation</div>
+      <div id="crypto-news-count" class="news-count" style="display:none;"></div>
+      <div class="news-feed" id="crypto-news">
+        <div class="news-loading">SCANNING FEEDS...</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+let wtiAutoUpdate = true;
+let lastWtiPrice = null;
+let lastBtcPrice = null;
+
+const PROXY = 'https://api.allorigins.win/raw?url=';
+
+const TARGETS = [
+  { price: 60.00, label: 'Max downside',          section: 'loss' },
+  { price: 61.00, label: 'Exit zone',              section: 'loss' },
+  { price: 62.00, label: 'Caution',                section: 'loss' },
+  { price: 63.00, label: 'STOP LOSS',              section: 'stop' },
+  { price: 64.00, label: 'Watch',                  section: 'loss' },
+  { price: 65.68, label: 'Entry',                  section: 'entry' },
+  { price: 70.00, label: 'Min target - sell/hold', section: 'profit' },
+  { price: 75.00, label: 'Solid win',              section: 'profit' },
+  { price: 80.00, label: 'Strong',                 section: 'profit' },
+  { price: 85.00, label: 'Very strong',            section: 'profit' },
+  { price: 90.00, label: 'Primary target',         section: 'profit' },
+  { price: 95.00, label: 'Bonus territory',        section: 'profit' },
+  { price: 100.00,label: 'Max scenario',           section: 'profit' },
+];
+
+// ============================================================
+// PRICE APIS
+// ============================================================
+
+async function fetchWTI() {
+  // Primary: Yahoo Finance via allorigins proxy
+  try {
+    const url = 'https://query2.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=5d';
+    const res = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
+    const data = await res.json();
+    const meta = data.chart.result[0].meta;
+    return {
+      price:   meta.regularMarketPrice,
+      prev:    meta.chartPreviousClose,
+      change:  meta.regularMarketPrice - meta.chartPreviousClose,
+      pct:     ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose * 100),
+      high:    meta.regularMarketDayHigh  || null,
+      low:     meta.regularMarketDayLow   || null,
+      high52:  meta.fiftyTwoWeekHigh      || null,
+      low52:   meta.fiftyTwoWeekLow       || null,
+    };
+  } catch(e) {
+    console.warn('WTI primary fetch failed:', e.message);
+  }
+
+  // Fallback: Yahoo Finance direct (may fail due to CORS but worth trying)
+  try {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=2d';
+    const res = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(10000) });
+    const data = await res.json();
+    const meta = data.chart.result[0].meta;
+    return {
+      price:  meta.regularMarketPrice,
+      prev:   meta.chartPreviousClose,
+      change: meta.regularMarketPrice - meta.chartPreviousClose,
+      pct:    ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose * 100),
+      high:   meta.regularMarketDayHigh  || null,
+      low:    meta.regularMarketDayLow   || null,
+    };
+  } catch(e) {
+    console.warn('WTI fallback fetch failed:', e.message);
+    return null;
+  }
+}
+
+async function fetchBTC() {
+  // Primary: CoinGecko (no key required, CORS-friendly)
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_last_updated_at=true',
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const data = await res.json();
+    const pct = data.bitcoin.usd_24h_change;
+    return {
+      price:  data.bitcoin.usd,
+      change: data.bitcoin.usd * pct / 100,
+      pct:    pct,
+      vol24:  data.bitcoin.usd_24h_vol || null,
+    };
+  } catch(e) {
+    console.warn('BTC CoinGecko failed:', e.message);
+  }
+
+  // Fallback: CoinGecko markets endpoint
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&order=market_cap_desc&per_page=1&page=1&sparkline=false&price_change_percentage=24h',
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const data = await res.json();
+    const btc = data[0];
+    return {
+      price:  btc.current_price,
+      change: btc.price_change_24h,
+      pct:    btc.price_change_percentage_24h,
+      high:   btc.high_24h,
+      low:    btc.low_24h,
+      vol24:  btc.total_volume,
+    };
+  } catch(e) {
+    console.warn('BTC fallback failed:', e.message);
+    return null;
+  }
+}
+
+// ============================================================
+// NEWS FEEDS — Multi-source with fallback
+// ============================================================
+
+// Primary: Google News RSS (broadest coverage, all sources across the internet)
+const OIL_GNEWS   = 'https://news.google.com/rss/search?q=crude+oil+WTI+Iran+OPEC+Hormuz+petroleum+energy+barrel&hl=en-US&gl=US&ceid=US:en';
+const CRYPTO_GNEWS= 'https://news.google.com/rss/search?q=bitcoin+stablecoin+crypto+regulation+SEC+CBDC+blockchain&hl=en-US&gl=US&ceid=US:en';
+
+// Fallback specialist feeds
+const OIL_FALLBACK   = 'https://oilprice.com/rss/main';
+const CRYPTO_FALLBACK= 'https://cointelegraph.com/rss';
+
+function parseRSSXML(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const items = doc.querySelectorAll('item');
+  const results = [];
+  items.forEach(item => {
+    const title   = item.querySelector('title');
+    const link    = item.querySelector('link');
+    const pubDate = item.querySelector('pubDate');
+    const source  = item.querySelector('source');
+    let titleText = title ? (title.textContent || title.innerHTML || '') : '';
+    // Strip CDATA wrappers if present
+    titleText = titleText.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '').trim();
+    // Strip trailing " - Source Name" from Google News titles
+    titleText = titleText.replace(/ - [^-]{2,60}$/, '').trim();
+    // Decode HTML entities
+    titleText = decodeHTMLEntities(titleText);
+
+    let linkHref = '';
+    if (link) {
+      // <link> in RSS can be text node or nextSibling text
+      linkHref = link.textContent.trim() || '';
+    }
+
+    let sourceName = '';
+    if (source) {
+      sourceName = source.textContent.trim();
+    } else if (linkHref) {
+      try { sourceName = new URL(linkHref).hostname.replace(/^www\./, ''); } catch(e) {}
+    }
+
+    results.push({
+      title:   titleText,
+      link:    linkHref,
+      pubDate: pubDate ? pubDate.textContent.trim() : '',
+      source:  sourceName,
+    });
+  });
+  return results;
+}
+
+function decodeHTMLEntities(str) {
+  const el = document.createElement('div');
+  el.innerHTML = str;
+  return el.textContent || el.innerText || str;
+}
+
+async function fetchFeedViaProxy(rssUrl, timeout = 15000) {
+  const proxied = PROXY + encodeURIComponent(rssUrl);
+  const res = await fetch(proxied, { signal: AbortSignal.timeout(timeout) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if (!text || text.length < 100) throw new Error('Empty response');
+  return parseRSSXML(text);
+}
+
+async function fetchOilNews() {
+  // Try Google News first (broadest coverage)
+  try {
+    const items = await fetchFeedViaProxy(OIL_GNEWS, 18000);
+    if (items.length > 0) return { items, source: 'Google News' };
+  } catch(e) {
+    console.warn('Oil Google News failed:', e.message);
+  }
+  // Fallback to OilPrice.com
+  try {
+    const items = await fetchFeedViaProxy(OIL_FALLBACK, 12000);
+    if (items.length > 0) return { items, source: 'OilPrice.com' };
+  } catch(e) {
+    console.warn('Oil fallback feed failed:', e.message);
+  }
+  return { items: [], source: null };
+}
+
+async function fetchCryptoNews() {
+  // Try Google News first (broadest coverage)
+  try {
+    const items = await fetchFeedViaProxy(CRYPTO_GNEWS, 18000);
+    if (items.length > 0) return { items, source: 'Google News' };
+  } catch(e) {
+    console.warn('Crypto Google News failed:', e.message);
+  }
+  // Fallback to CoinTelegraph
+  try {
+    const items = await fetchFeedViaProxy(CRYPTO_FALLBACK, 12000);
+    if (items.length > 0) return { items, source: 'CoinTelegraph' };
+  } catch(e) {
+    console.warn('Crypto fallback feed failed:', e.message);
+  }
+  return { items: [], source: null };
+}
+
+// ============================================================
+// RENDER HELPERS
+// ============================================================
+
+function fmt(n, dec = 2) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+function fmtSign(n) {
+  return (n >= 0 ? '+' : '') + fmt(n);
+}
+
+function fmtDollar(n) {
+  const abs = Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return (n >= 0 ? '+$' : '-$') + abs;
+}
+
+function timeSince(dateStr) {
+  if (!dateStr) return '';
+  const mins = Math.floor((Date.now() - new Date(dateStr)) / 60000);
+  if (isNaN(mins) || mins < 0) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function flashCard(cardId, direction) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.remove('flash-up', 'flash-down');
+  void card.offsetWidth; // reflow
+  card.classList.add(direction === 'up' ? 'flash-up' : 'flash-down');
+}
+
+function renderIntradayBar(prefix, price, low, high) {
+  const bar = document.getElementById(prefix + '-intraday');
+  if (!bar || !low || !high || low >= high) return;
+  bar.style.display = 'block';
+  document.getElementById(prefix + '-low-lbl').textContent  = '$' + fmt(low);
+  document.getElementById(prefix + '-high-lbl').textContent = '$' + fmt(high);
+  const pct = Math.max(0, Math.min(100, ((price - low) / (high - low)) * 100));
+  document.getElementById(prefix + '-range-fill').style.width   = pct + '%';
+  document.getElementById(prefix + '-range-marker').style.left  = pct + '%';
+}
+
+function renderPrice(valId, changeId, cardId, data, isBTC) {
+  const valEl    = document.getElementById(valId);
+  const changeEl = document.getElementById(changeId);
+
+  if (!data) {
+    valEl.textContent    = 'N/A';
+    changeEl.textContent = 'Unable to load price data';
+    changeEl.style.color = 'var(--dim)';
+    return;
+  }
+
+  const newPrice = data.price;
+  const oldPrice = isBTC ? lastBtcPrice : lastWtiPrice;
+
+  // Flash on price change
+  if (oldPrice !== null && oldPrice !== newPrice) {
+    flashCard(cardId, newPrice > oldPrice ? 'up' : 'down');
+  }
+
+  if (isBTC) lastBtcPrice = newPrice;
+  else        lastWtiPrice = newPrice;
+
+  valEl.textContent = isBTC
+    ? Math.round(newPrice).toLocaleString()
+    : fmt(newPrice);
+
+  const cls = data.change >= 0 ? 'up' : 'down';
+  changeEl.className = cls;
+  changeEl.innerHTML = `${fmtSign(data.change)} &nbsp; ${fmtSign(data.pct)}% &nbsp; <span style="color:var(--dim)">24h</span>`;
+
+  // Intraday range bar
+  if (!isBTC && data.high && data.low) {
+    renderIntradayBar('wti', newPrice, data.low, data.high);
+    // Update meta with live data
+    const metaEl = document.getElementById('wti-meta');
+    if (metaEl && data.high52 && data.low52) {
+      metaEl.innerHTML =
+        `<strong>Day High</strong> &middot; $${fmt(data.high)} &nbsp; <strong>Day Low</strong> &middot; $${fmt(data.low)}<br>` +
+        `<strong>52w High</strong> &middot; $${fmt(data.high52)} &nbsp; <strong>52w Low</strong> &middot; $${fmt(data.low52)}<br>` +
+        `<strong>Prev Close</strong> &middot; $${fmt(data.prev)}`;
+    }
+  }
+
+  if (isBTC && data.high && data.low) {
+    renderIntradayBar('btc', newPrice, data.low, data.high);
+  }
+}
+
+function renderNews(result, feedId, countId) {
+  const feedEl  = document.getElementById(feedId);
+  const countEl = document.getElementById(countId);
+  const { items, source } = result;
+
+  if (!items || items.length === 0) {
+    feedEl.innerHTML = '<div class="news-error">Feed unavailable &mdash; check connection or try refreshing.</div>';
+    return;
+  }
+
+  const displayItems = items.slice(0, 20);
+
+  if (countEl) {
+    countEl.style.display = 'block';
+    countEl.textContent   = `${displayItems.length} articles &mdash; via ${source || 'RSS'}`;
+  }
+
+  feedEl.innerHTML = displayItems.map(item => {
+    if (!item.title) return '';
+    const time = timeSince(item.pubDate);
+    const src  = item.source || (item.link ? (() => { try { return new URL(item.link).hostname.replace(/^www\./, ''); } catch(e) { return ''; } })() : '');
+    const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeLink  = item.link ? item.link.replace(/"/g, '&quot;') : '#';
+    return `<div class="news-item" onclick="window.open('${safeLink}','_blank','noopener')">
+      <div class="news-source"><span>${src}</span><span>${time}</span></div>
+      <div class="news-title">${safeTitle}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+}
+
+// ============================================================
+// CALCULATOR
+// ============================================================
+
+function onManualPrice() {
+  wtiAutoUpdate = false;
+  updateCalc();
+}
+
+function updateCalc() {
+  const entry     = parseFloat(document.getElementById('entry-price').value)   || 65.68;
+  const contracts = parseInt(document.getElementById('num-contracts').value)   || 1;
+  const current   = parseFloat(document.getElementById('current-price').value) || entry;
+  const stopLoss  = parseFloat(document.getElementById('stop-loss').value)     || 63.00;
+
+  const bbl     = contracts * 1000;
+  const livePnl = (current - entry) * bbl;
+
+  const pnlEl  = document.getElementById('pnl-value');
+  const pnlSub = document.getElementById('pnl-sub');
+  pnlEl.textContent  = fmtDollar(livePnl);
+  pnlEl.style.color  = livePnl >= 0 ? 'var(--green)' : 'var(--red)';
+  pnlSub.textContent = `${contracts} contract${contracts !== 1 ? 's' : ''} \u00b7 ${bbl.toLocaleString()} bbl`;
+
+  // Update entry row dynamically
+  const entryTarget = TARGETS.find(t => t.section === 'entry');
+  if (entryTarget) entryTarget.price = entry;
+
+  const tbody = document.getElementById('pnl-body');
+  let lastSection = '';
+  tbody.innerHTML = TARGETS.map(t => {
+    const pnl      = (t.price - entry) * bbl;
+    const isProfit = pnl > 0;
+    const isStop   = t.section === 'stop';
+    const isEntry  = t.section === 'entry';
+    const isLive   = !isEntry && Math.abs(t.price - current) < 1.0 && t.price !== entry;
+
+    let divider = '';
+    if (t.section !== lastSection && t.section === 'profit' && lastSection !== 'profit' && lastSection !== '') {
+      divider = `<tr class="divider-row"><td colspan="4">UPSIDE TARGETS</td></tr>`;
+    }
+    lastSection = t.section;
+
+    const rowClass = [
+      isLive   ? 'row-live'   : '',
+      isStop   ? 'row-stop'   : '',
+      isProfit ? 'row-profit' : 'row-loss',
+    ].filter(Boolean).join(' ');
+
+    const signal = isLive  ? 'LIVE'
+                 : isStop  ? 'EXIT'
+                 : isEntry ? 'ENTRY'
+                 : t.label;
+
+    const pnlStr  = isEntry ? '&mdash;' : fmtDollar(pnl);
+    const diffStr = isEntry ? '0.00' : fmtSign(t.price - entry);
+
+    return `${divider}<tr class="${rowClass}">
+      <td>$${fmt(t.price)}</td>
+      <td class="${isProfit || isEntry ? 'up' : 'down'}">${diffStr}</td>
+      <td>${pnlStr}</td>
+      <td>${signal}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// MAIN REFRESH
+// ============================================================
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = 'Loading...';
+  btn.classList.add('loading');
+
+  try {
+    // Prices load in parallel
+    const [wti, btc] = await Promise.all([fetchWTI(), fetchBTC()]);
+
+    renderPrice('wti-val', 'wti-change', 'wti-card', wti, false);
+    renderPrice('btc-val', 'btc-change', 'btc-card', btc, true);
+
+    // Auto-sync current price field with live WTI
+    if (wti && wtiAutoUpdate) {
+      document.getElementById('current-price').value = wti.price.toFixed(2);
+      updateCalc();
+    }
+
+    // News loads in parallel (non-blocking — doesn't delay price display)
+    Promise.all([fetchOilNews(), fetchCryptoNews()])
+      .then(([oilResult, cryptoResult]) => {
+        renderNews(oilResult,    'oil-news',    'oil-news-count');
+        renderNews(cryptoResult, 'crypto-news', 'crypto-news-count');
+      })
+      .catch(err => console.warn('News fetch error:', err));
+
+  } catch(err) {
+    console.error('Refresh error:', err);
+  } finally {
+    btn.textContent = 'Refresh';
+    btn.classList.remove('loading');
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+updateCalc();
+refreshAll();
+
+// Auto-refresh every 90 seconds
+setInterval(refreshAll, 90000);
+</script>
+
+</body>
+</html>
