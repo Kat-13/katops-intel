@@ -238,6 +238,43 @@
       transform: translateX(-50%);
     }
 
+    /* ===== DXY ROW ===== */
+    .dxy-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .dxy-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+      min-width: 28px;
+    }
+
+    .dxy-value {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--bright);
+      letter-spacing: 0.5px;
+    }
+
+    .dxy-arrow {
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .dxy-change {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
     /* ===== QUOTE STRIP ===== */
     .quote-strip {
       display: grid;
@@ -609,6 +646,12 @@
       <div class="quote-cell"><div class="quote-cell-label">Volume</div><div class="quote-cell-value" id="q-vol">---</div></div>
     </div>
     <div class="quote-approx-note" id="wti-approx-note" style="display:none;">~ bid/ask are last-trade approximations; +/- a few cents is standard for futures</div>
+    <div class="dxy-row" id="dxy-row" style="display:none;">
+      <span class="dxy-label">DXY</span>
+      <span class="dxy-value" id="dxy-val">---</span>
+      <span class="dxy-arrow" id="dxy-arrow"></span>
+      <span class="dxy-change" id="dxy-change"></span>
+    </div>
   </div>
 
   <!-- BTC CARD + SHORT CALCULATOR -->
@@ -824,6 +867,31 @@ async function fetchWTI() {
       };
     } catch(e) {
       console.warn('WTI fetch failed:', e.message);
+    }
+  }
+  return null;
+}
+
+async function fetchDXY() {
+  // DXY (US Dollar Index) — fetched directly from Yahoo Finance (no proxy needed, CORS-open)
+  const urls = [
+    'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
+    'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
+  ];
+  for (const url of urls) {
+    try {
+      const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      const meta = data.chart.result[0].meta;
+      const prev = meta.chartPreviousClose || meta.previousClose;
+      return {
+        price:  meta.regularMarketPrice,
+        prev:   prev,
+        change: meta.regularMarketPrice - prev,
+        pct:    ((meta.regularMarketPrice - prev) / prev * 100),
+      };
+    } catch(e) {
+      console.warn('DXY fetch failed:', e.message);
     }
   }
   return null;
@@ -1259,10 +1327,25 @@ async function refreshAll() {
 
   try {
     // Prices load in parallel
-    const [wti, btc] = await Promise.all([fetchWTI(), fetchBTC()]);
+    const [wti, btc, dxy] = await Promise.all([fetchWTI(), fetchBTC(), fetchDXY()]);
 
     renderPrice('wti-val', 'wti-change', 'wti-card', wti, false);
     renderPrice('btc-val', 'btc-change', 'btc-card', btc, true);
+
+    // Render DXY
+    if (dxy) {
+      const dxyRow    = document.getElementById('dxy-row');
+      const dxyVal    = document.getElementById('dxy-val');
+      const dxyArrow  = document.getElementById('dxy-arrow');
+      const dxyChange = document.getElementById('dxy-change');
+      const up        = dxy.change >= 0;
+      dxyVal.textContent    = dxy.price.toFixed(3);
+      dxyArrow.textContent  = up ? '\u25B2' : '\u25BC';  // solid up/down triangle
+      dxyArrow.style.color  = up ? 'var(--green)' : 'var(--red)';
+      dxyChange.textContent = `${up ? '+' : ''}${dxy.change.toFixed(3)} (${up ? '+' : ''}${dxy.pct.toFixed(2)}%)`;
+      dxyChange.style.color = up ? 'var(--green)' : 'var(--red)';
+      dxyRow.style.display  = 'flex';
+    }
 
     // Auto-sync current price field with live WTI
     if (wti && wtiAutoUpdate) {
@@ -1377,8 +1460,8 @@ updateCalc();
 updateBtcCalc();
 refreshAll();
 
-// Auto-refresh every 90 seconds
-setInterval(refreshAll, 90000);
+// Auto-refresh every 30 seconds
+setInterval(refreshAll, 30000);
 </script>
 
 </body>
