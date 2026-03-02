@@ -1,12 +1,8 @@
 <!DOCTYPE html>
-<!-- KATOPS build: v20260302-1 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <title>KATOPS // MARKET INTEL</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -240,43 +236,6 @@
       background: var(--bright);
       border-radius: 1px;
       transform: translateX(-50%);
-    }
-
-    /* ===== DXY ROW ===== */
-    .dxy-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-
-    .dxy-label {
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--dim);
-      min-width: 28px;
-    }
-
-    .dxy-value {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--bright);
-      letter-spacing: 0.5px;
-    }
-
-    .dxy-arrow {
-      font-size: 16px;
-      line-height: 1;
-      font-weight: 700;
-    }
-
-    .dxy-change {
-      font-size: 11px;
-      color: var(--dim);
     }
 
     /* ===== QUOTE STRIP ===== */
@@ -650,12 +609,6 @@
       <div class="quote-cell"><div class="quote-cell-label">Volume</div><div class="quote-cell-value" id="q-vol">---</div></div>
     </div>
     <div class="quote-approx-note" id="wti-approx-note" style="display:none;">~ bid/ask are last-trade approximations; +/- a few cents is standard for futures</div>
-    <div class="dxy-row" id="dxy-row" style="display:none;">
-      <span class="dxy-label">DXY</span>
-      <span class="dxy-value" id="dxy-val">---</span>
-      <span class="dxy-arrow" id="dxy-arrow"></span>
-      <span class="dxy-change" id="dxy-change"></span>
-    </div>
   </div>
 
   <!-- BTC CARD + SHORT CALCULATOR -->
@@ -805,23 +758,7 @@ let wtiAutoUpdate = true;
 let lastWtiPrice = null;
 let lastBtcPrice = null;
 
-const PROXY  = 'https://api.allorigins.win/raw?url=';
-const PROXY2 = 'https://corsproxy.io/?';
-
-// Race two proxies — each gets its own signal so they cannot cancel each other
-async function proxyFetch(yahooUrl, timeoutMs = 12000) {
-  const tryOne = async (url) => {
-    const res  = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    const data = await res.json();
-    if (!data) throw new Error('Empty JSON');
-    return data;
-  };
-  return Promise.any([
-    tryOne(PROXY  + encodeURIComponent(yahooUrl)),
-    tryOne(PROXY2 + encodeURIComponent(yahooUrl)),
-    tryOne(yahooUrl),
-  ]);
-}
+const PROXY = 'https://api.allorigins.win/raw?url=';
 
 const TARGETS = [
   { price: 60.00, label: 'Max downside',          section: 'loss'   },
@@ -856,7 +793,8 @@ async function fetchWTI() {
   ];
   for (const url of urls) {
     try {
-      const data = await proxyFetch(url, 14000);
+      const res  = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(14000) });
+      const data = await res.json();
       const result = data.chart.result[0];
       const meta   = result.meta;
       const q      = result.indicators.quote[0];
@@ -886,31 +824,6 @@ async function fetchWTI() {
       };
     } catch(e) {
       console.warn('WTI fetch failed:', e.message);
-    }
-  }
-  return null;
-}
-
-async function fetchDXY() {
-  // DXY (US Dollar Index) — race both proxies + direct for fastest response
-  const urls = [
-    'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
-    'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
-  ];
-  for (const url of urls) {
-    try {
-      const data = await proxyFetch(url, 12000);
-      const meta = data.chart.result[0].meta;
-      const prev = meta.chartPreviousClose || meta.previousClose;
-      if (!meta.regularMarketPrice) continue;
-      return {
-        price:  meta.regularMarketPrice,
-        prev:   prev,
-        change: meta.regularMarketPrice - prev,
-        pct:    ((meta.regularMarketPrice - prev) / prev * 100),
-      };
-    } catch(e) {
-      console.warn('DXY attempt failed:', e.message);
     }
   }
   return null;
@@ -1051,18 +964,11 @@ function decodeHTMLEntities(str) {
 }
 
 async function fetchFeedViaProxy(rssUrl, timeout = 18000) {
-  // Race both proxies — each gets its own signal so they cannot cancel each other
-  const tryFetch = async (url) => {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    if (!text || text.length < 100) throw new Error('Empty response');
-    return text;
-  };
-  const text = await Promise.any([
-    tryFetch(PROXY  + encodeURIComponent(rssUrl)),
-    tryFetch(PROXY2 + encodeURIComponent(rssUrl)),
-  ]);
+  const proxied = PROXY + encodeURIComponent(rssUrl);
+  const res = await fetch(proxied, { signal: AbortSignal.timeout(timeout) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if (!text || text.length < 100) throw new Error('Empty response');
   return parseRSSXML(text);
 }
 
@@ -1353,25 +1259,10 @@ async function refreshAll() {
 
   try {
     // Prices load in parallel
-    const [wti, btc, dxy] = await Promise.all([fetchWTI(), fetchBTC(), fetchDXY()]);
+    const [wti, btc] = await Promise.all([fetchWTI(), fetchBTC()]);
 
     renderPrice('wti-val', 'wti-change', 'wti-card', wti, false);
     renderPrice('btc-val', 'btc-change', 'btc-card', btc, true);
-
-    // Render DXY
-    if (dxy) {
-      const dxyRow    = document.getElementById('dxy-row');
-      const dxyVal    = document.getElementById('dxy-val');
-      const dxyArrow  = document.getElementById('dxy-arrow');
-      const dxyChange = document.getElementById('dxy-change');
-      const up        = dxy.change >= 0;
-      dxyVal.textContent    = dxy.price.toFixed(3);
-      dxyArrow.textContent  = up ? '\u25B2' : '\u25BC';  // solid up/down triangle
-      dxyArrow.style.color  = up ? 'var(--green)' : 'var(--red)';
-      dxyChange.textContent = `${up ? '+' : ''}${dxy.change.toFixed(3)} (${up ? '+' : ''}${dxy.pct.toFixed(2)}%)`;
-      dxyChange.style.color = up ? 'var(--green)' : 'var(--red)';
-      dxyRow.style.display  = 'flex';
-    }
 
     // Auto-sync current price field with live WTI
     if (wti && wtiAutoUpdate) {
@@ -1486,8 +1377,8 @@ updateCalc();
 updateBtcCalc();
 refreshAll();
 
-// Auto-refresh every 30 seconds
-setInterval(refreshAll, 30000);
+// Auto-refresh every 90 seconds
+setInterval(refreshAll, 90000);
 </script>
 
 </body>
