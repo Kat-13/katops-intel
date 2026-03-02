@@ -801,7 +801,28 @@ let wtiAutoUpdate = true;
 let lastWtiPrice = null;
 let lastBtcPrice = null;
 
-const PROXY = 'https://api.allorigins.win/raw?url=';
+const PROXY  = 'https://api.allorigins.win/raw?url=';
+const PROXY2 = 'https://corsproxy.io/?';
+
+// Race two proxies — whichever responds first wins
+async function proxyFetch(yahooUrl, timeoutMs = 12000) {
+  const sig = AbortSignal.timeout(timeoutMs);
+  const attempts = [
+    fetch(PROXY  + encodeURIComponent(yahooUrl), { signal: sig }),
+    fetch(PROXY2 + encodeURIComponent(yahooUrl), { signal: sig }),
+    fetch(yahooUrl, { signal: sig }),
+  ];
+  // Return first successful JSON parse
+  return new Promise((resolve, reject) => {
+    let settled = 0;
+    const total = attempts.length;
+    attempts.forEach(p => {
+      p.then(r => r.json())
+       .then(d => { if (!settled) { settled = 1; resolve(d); } })
+       .catch(() => { if (++settled === total) reject(new Error('All proxies failed')); });
+    });
+  });
+}
 
 const TARGETS = [
   { price: 60.00, label: 'Max downside',          section: 'loss'   },
@@ -836,8 +857,7 @@ async function fetchWTI() {
   ];
   for (const url of urls) {
     try {
-      const res  = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(14000) });
-      const data = await res.json();
+      const data = await proxyFetch(url, 14000);
       const result = data.chart.result[0];
       const meta   = result.meta;
       const q      = result.indicators.quote[0];
@@ -873,19 +893,14 @@ async function fetchWTI() {
 }
 
 async function fetchDXY() {
-  // DXY (US Dollar Index) — try proxy first (Safari iOS requires it), then direct as fallback
-  const dxyYahoo = 'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d';
-  const dxyYahoo2 = 'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d';
-  const attempts = [
-    PROXY + encodeURIComponent(dxyYahoo),
-    PROXY + encodeURIComponent(dxyYahoo2),
-    dxyYahoo,
-    dxyYahoo2,
+  // DXY (US Dollar Index) — race both proxies + direct for fastest response
+  const urls = [
+    'https://query2.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
+    'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d',
   ];
-  for (const url of attempts) {
+  for (const url of urls) {
     try {
-      const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
-      const data = await res.json();
+      const data = await proxyFetch(url, 12000);
       const meta = data.chart.result[0].meta;
       const prev = meta.chartPreviousClose || meta.previousClose;
       if (!meta.regularMarketPrice) continue;
