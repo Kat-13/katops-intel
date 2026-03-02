@@ -804,24 +804,19 @@ let lastBtcPrice = null;
 const PROXY  = 'https://api.allorigins.win/raw?url=';
 const PROXY2 = 'https://corsproxy.io/?';
 
-// Race two proxies — whichever responds first wins
+// Race two proxies — each gets its own signal so they cannot cancel each other
 async function proxyFetch(yahooUrl, timeoutMs = 12000) {
-  const sig = AbortSignal.timeout(timeoutMs);
-  const attempts = [
-    fetch(PROXY  + encodeURIComponent(yahooUrl), { signal: sig }),
-    fetch(PROXY2 + encodeURIComponent(yahooUrl), { signal: sig }),
-    fetch(yahooUrl, { signal: sig }),
-  ];
-  // Return first successful JSON parse
-  return new Promise((resolve, reject) => {
-    let settled = 0;
-    const total = attempts.length;
-    attempts.forEach(p => {
-      p.then(r => r.json())
-       .then(d => { if (!settled) { settled = 1; resolve(d); } })
-       .catch(() => { if (++settled === total) reject(new Error('All proxies failed')); });
-    });
-  });
+  const tryOne = async (url) => {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    const data = await res.json();
+    if (!data) throw new Error('Empty JSON');
+    return data;
+  };
+  return Promise.any([
+    tryOne(PROXY  + encodeURIComponent(yahooUrl)),
+    tryOne(PROXY2 + encodeURIComponent(yahooUrl)),
+    tryOne(yahooUrl),
+  ]);
 }
 
 const TARGETS = [
@@ -1052,10 +1047,9 @@ function decodeHTMLEntities(str) {
 }
 
 async function fetchFeedViaProxy(rssUrl, timeout = 18000) {
-  // Race both proxies — whichever returns valid XML first wins
-  const sig = AbortSignal.timeout(timeout);
+  // Race both proxies — each gets its own signal so they cannot cancel each other
   const tryFetch = async (url) => {
-    const res = await fetch(url, { signal: sig });
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     if (!text || text.length < 100) throw new Error('Empty response');
