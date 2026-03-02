@@ -1052,11 +1052,19 @@ function decodeHTMLEntities(str) {
 }
 
 async function fetchFeedViaProxy(rssUrl, timeout = 18000) {
-  const proxied = PROXY + encodeURIComponent(rssUrl);
-  const res = await fetch(proxied, { signal: AbortSignal.timeout(timeout) });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const text = await res.text();
-  if (!text || text.length < 100) throw new Error('Empty response');
+  // Race both proxies — whichever returns valid XML first wins
+  const sig = AbortSignal.timeout(timeout);
+  const tryFetch = async (url) => {
+    const res = await fetch(url, { signal: sig });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if (!text || text.length < 100) throw new Error('Empty response');
+    return text;
+  };
+  const text = await Promise.any([
+    tryFetch(PROXY  + encodeURIComponent(rssUrl)),
+    tryFetch(PROXY2 + encodeURIComponent(rssUrl)),
+  ]);
   return parseRSSXML(text);
 }
 
