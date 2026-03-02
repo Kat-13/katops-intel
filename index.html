@@ -238,6 +238,49 @@
       transform: translateX(-50%);
     }
 
+    /* ===== QUOTE STRIP ===== */
+    .quote-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    .quote-cell {
+      background: var(--bg);
+      padding: 7px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .quote-cell-label {
+      font-size: 8px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .quote-cell-value {
+      font-size: 13px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.5px;
+    }
+
+    .quote-approx-note {
+      font-size: 8px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-top: 3px;
+      margin-bottom: 10px;
+      opacity: 0.7;
+    }
+
     /* ===== CALCULATOR ===== */
     .calc-inputs {
       display: grid;
@@ -543,9 +586,8 @@
       <span id="wti-change" style="color:var(--dim)">Loading...</span>
     </div>
     <div class="price-meta" id="wti-meta">
-      <strong>1 contract</strong> = 1,000 barrels<br>
-      <strong>Settlement</strong> &middot; MAR 20, 2026<br>
-      <strong>Margin req.</strong> &middot; ~$5&ndash;7K / contract
+      <strong>Micro (QM)</strong> = 100 bbl &middot; cash settled &nbsp;&nbsp;
+      <strong>Full (CL)</strong> = 1,000 bbl &middot; physical delivery
     </div>
     <div class="intraday-bar" id="wti-intraday" style="display:none;">
       <div class="intraday-label-row">
@@ -558,6 +600,15 @@
         <div class="intraday-marker" id="wti-range-marker" style="left:50%"></div>
       </div>
     </div>
+    <div class="quote-strip" id="wti-quote-strip" style="display:none;">
+      <div class="quote-cell"><div class="quote-cell-label">Open</div><div class="quote-cell-value" id="q-open">---</div></div>
+      <div class="quote-cell"><div class="quote-cell-label">High</div><div class="quote-cell-value" id="q-high">---</div></div>
+      <div class="quote-cell"><div class="quote-cell-label">Low</div><div class="quote-cell-value" id="q-low">---</div></div>
+      <div class="quote-cell"><div class="quote-cell-label">Bid ~</div><div class="quote-cell-value" id="q-bid">---</div></div>
+      <div class="quote-cell"><div class="quote-cell-label">Ask ~</div><div class="quote-cell-value" id="q-ask">---</div></div>
+      <div class="quote-cell"><div class="quote-cell-label">Volume</div><div class="quote-cell-value" id="q-vol">---</div></div>
+    </div>
+    <div class="quote-approx-note" id="wti-approx-note" style="display:none;">~ bid/ask are last-trade approximations; +/- a few cents is standard for futures</div>
   </div>
 
   <!-- BTC CARD + SHORT CALCULATOR -->
@@ -625,8 +676,11 @@
         <input type="number" class="input-field" id="entry-price" value="65.68" step="0.01" oninput="updateCalc()">
       </div>
       <div class="input-group">
-        <div class="input-label">Contracts</div>
-        <input type="number" class="input-field" id="num-contracts" value="1" min="1" oninput="updateCalc()">
+        <div class="input-label">Contract Size</div>
+        <select class="input-field" id="wti-size" onchange="updateCalc()" style="cursor:pointer">
+          <option value="100">Micro QM (100 bbl)</option>
+          <option value="1000">Full CL (1,000 bbl)</option>
+        </select>
       </div>
       <div class="input-group">
         <div class="input-label">Current Price ($)</div>
@@ -707,19 +761,24 @@ let lastBtcPrice = null;
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 const TARGETS = [
-  { price: 60.00, label: 'Max downside',          section: 'loss' },
-  { price: 61.00, label: 'Exit zone',              section: 'loss' },
-  { price: 62.00, label: 'Caution',                section: 'loss' },
-  { price: 63.00, label: 'STOP LOSS',              section: 'stop' },
-  { price: 64.00, label: 'Watch',                  section: 'loss' },
-  { price: 65.68, label: 'Entry',                  section: 'entry' },
-  { price: 70.00, label: 'Min target - sell/hold', section: 'profit' },
-  { price: 75.00, label: 'Solid win',              section: 'profit' },
-  { price: 80.00, label: 'Strong',                 section: 'profit' },
-  { price: 85.00, label: 'Very strong',            section: 'profit' },
-  { price: 90.00, label: 'Primary target',         section: 'profit' },
-  { price: 95.00, label: 'Bonus territory',        section: 'profit' },
-  { price: 100.00,label: 'Max scenario',           section: 'profit' },
+  { price: 60.00, label: 'Max downside',          section: 'loss'   },
+  { price: 61.00, label: 'Exit zone',             section: 'loss'   },
+  { price: 62.00, label: 'Caution',               section: 'loss'   },
+  { price: 63.00, label: 'STOP LOSS',             section: 'stop'   },
+  { price: 64.00, label: 'Watch',                 section: 'loss'   },
+  { price: 65.68, label: 'Entry',                 section: 'entry'  },
+  { price: 70.00, label: 'Min target',            section: 'profit' },
+  { price: 75.00, label: 'Solid win',             section: 'profit' },
+  { price: 80.00, label: 'Strong',                section: 'profit' },
+  { price: 85.00, label: 'Very strong',           section: 'profit' },
+  { price: 90.00, label: 'Primary target',        section: 'profit' },
+  { price: 95.00, label: 'Bonus territory',       section: 'profit' },
+  { price: 100.00,label: 'Geopolitical premium',  section: 'profit' },
+  { price: 110.00,label: 'Supply shock',          section: 'profit' },
+  { price: 120.00,label: 'Crisis level',          section: 'profit' },
+  { price: 130.00,label: 'Extreme scenario',      section: 'profit' },
+  { price: 140.00,label: 'War premium',           section: 'profit' },
+  { price: 150.00,label: 'Max scenario',          section: 'profit' },
 ];
 
 // ============================================================
@@ -727,44 +786,47 @@ const TARGETS = [
 // ============================================================
 
 async function fetchWTI() {
-  // Primary: Yahoo Finance via allorigins proxy
-  try {
-    const url = 'https://query2.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=5d';
-    const res = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
-    const data = await res.json();
-    const meta = data.chart.result[0].meta;
-    return {
-      price:   meta.regularMarketPrice,
-      prev:    meta.chartPreviousClose,
-      change:  meta.regularMarketPrice - meta.chartPreviousClose,
-      pct:     ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose * 100),
-      high:    meta.regularMarketDayHigh  || null,
-      low:     meta.regularMarketDayLow   || null,
-      high52:  meta.fiftyTwoWeekHigh      || null,
-      low52:   meta.fiftyTwoWeekLow       || null,
-    };
-  } catch(e) {
-    console.warn('WTI primary fetch failed:', e.message);
-  }
+  // Yahoo Finance v8 chart with 1m candles — gives open, high, low, volume, prev close, 52w, and bid/ask approx from last 2 candles
+  const urls = [
+    'https://query2.finance.yahoo.com/v8/finance/chart/CL=F?interval=1m&range=1d',
+    'https://query1.finance.yahoo.com/v8/finance/chart/CL=F?interval=1m&range=1d',
+  ];
+  for (const url of urls) {
+    try {
+      const res  = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(14000) });
+      const data = await res.json();
+      const result = data.chart.result[0];
+      const meta   = result.meta;
+      const q      = result.indicators.quote[0];
 
-  // Fallback: Yahoo Finance direct (may fail due to CORS but worth trying)
-  try {
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=2d';
-    const res = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
-    const meta = data.chart.result[0].meta;
-    return {
-      price:  meta.regularMarketPrice,
-      prev:   meta.chartPreviousClose,
-      change: meta.regularMarketPrice - meta.chartPreviousClose,
-      pct:    ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose * 100),
-      high:   meta.regularMarketDayHigh  || null,
-      low:    meta.regularMarketDayLow   || null,
-    };
-  } catch(e) {
-    console.warn('WTI fallback fetch failed:', e.message);
-    return null;
+      // Extract clean arrays
+      const opens  = (q.open   || []).filter(x => x != null);
+      const closes = (q.close  || []).filter(x => x != null);
+      const vols   = (q.volume || []).filter(x => x != null);
+
+      // Bid/ask approximation: last two 1-minute candle closes
+      const bid = closes.length >= 2 ? closes[closes.length - 2] : (closes[closes.length - 1] || null);
+      const ask = closes.length >= 1 ? closes[closes.length - 1] : null;
+
+      return {
+        price:  meta.regularMarketPrice,
+        prev:   meta.chartPreviousClose || meta.previousClose,
+        change: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose),
+        pct:    ((meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose)) / (meta.chartPreviousClose || meta.previousClose) * 100),
+        high:   meta.regularMarketDayHigh  || null,
+        low:    meta.regularMarketDayLow   || null,
+        high52: meta.fiftyTwoWeekHigh      || null,
+        low52:  meta.fiftyTwoWeekLow       || null,
+        open:   opens[0]                   || null,
+        volume: meta.regularMarketVolume   || (vols.reduce((a,b) => a+b, 0) || null),
+        bid:    bid,
+        ask:    ask,
+      };
+    } catch(e) {
+      console.warn('WTI fetch failed:', e.message);
+    }
   }
+  return null;
 }
 
 async function fetchBTC() {
@@ -1069,6 +1131,19 @@ function renderPrice(valId, changeId, cardId, data, isBTC) {
         `<strong>52w High</strong> &middot; $${fmt(data.high52)} &nbsp; <strong>52w Low</strong> &middot; $${fmt(data.low52)}<br>` +
         `<strong>Prev Close</strong> &middot; $${fmt(data.prev)}`;
     }
+    // Populate quote strip
+    const strip = document.getElementById('wti-quote-strip');
+    const note  = document.getElementById('wti-approx-note');
+    if (strip) {
+      document.getElementById('q-open').textContent = data.open  ? `$${fmt(data.open)}`  : '---';
+      document.getElementById('q-high').textContent = data.high  ? `$${fmt(data.high)}`  : '---';
+      document.getElementById('q-low').textContent  = data.low   ? `$${fmt(data.low)}`   : '---';
+      document.getElementById('q-bid').textContent  = data.bid   ? `$${fmt(data.bid)}`   : '---';
+      document.getElementById('q-ask').textContent  = data.ask   ? `$${fmt(data.ask)}`   : '---';
+      document.getElementById('q-vol').textContent  = data.volume ? data.volume.toLocaleString() : '---';
+      strip.style.display = 'grid';
+      if (note) note.style.display = 'block';
+    }
   }
 
   if (isBTC && data.high && data.low) {
@@ -1117,19 +1192,19 @@ function onManualPrice() {
 }
 
 function updateCalc() {
-  const entry     = parseFloat(document.getElementById('entry-price').value)   || 65.68;
-  const contracts = parseInt(document.getElementById('num-contracts').value)   || 1;
-  const current   = parseFloat(document.getElementById('current-price').value) || entry;
-  const stopLoss  = parseFloat(document.getElementById('stop-loss').value)     || 63.00;
+  const entry   = parseFloat(document.getElementById('entry-price').value)  || 65.68;
+  const bbl     = parseInt(document.getElementById('wti-size').value)       || 100;
+  const current = parseFloat(document.getElementById('current-price').value) || entry;
+  const stopLoss= parseFloat(document.getElementById('stop-loss').value)    || 63.00;
 
-  const bbl     = contracts * 1000;
   const livePnl = (current - entry) * bbl;
+  const isMicro = bbl === 100;
 
   const pnlEl  = document.getElementById('pnl-value');
   const pnlSub = document.getElementById('pnl-sub');
   pnlEl.textContent  = fmtDollar(livePnl);
   pnlEl.style.color  = livePnl >= 0 ? 'var(--green)' : 'var(--red)';
-  pnlSub.textContent = `${contracts} contract${contracts !== 1 ? 's' : ''} \u00b7 ${bbl.toLocaleString()} bbl`;
+  pnlSub.textContent = `${isMicro ? 'Micro QM' : 'Full CL'} \u00b7 ${bbl.toLocaleString()} bbl`;
 
   // Update entry row dynamically
   const entryTarget = TARGETS.find(t => t.section === 'entry');
